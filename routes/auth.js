@@ -19,10 +19,10 @@ router.get('/google/callback',
 router.post('/google', async (req, res) => {
   try {
     const { token } = req.body;
-    console.log('Received Token:', token); // Debug log
+    console.log('Received Token:', token);
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID
     });
     const payload = ticket.getPayload();
     console.log('Google Token Payload:', payload);
@@ -32,7 +32,7 @@ router.post('/google', async (req, res) => {
       user = new User({
         googleId: payload.sub,
         displayName: payload.name,
-        email: payload.email,
+        email: payload.email
       });
       await user.save();
     }
