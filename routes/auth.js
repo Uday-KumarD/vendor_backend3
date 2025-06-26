@@ -6,27 +6,26 @@ const User = require('../models/User');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Standard Google OAuth flow
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/login` }),
   (req, res) => {
-    console.log('Callback Success:', req.user); // Debug log
+    console.log('Callback Success:', req.user);
     res.redirect(`${process.env.FRONTEND_URL}/vendors`);
   }
 );
 
-// Handle token from frontend (@react-oauth/google)
 router.post('/google', async (req, res) => {
   try {
     const { token } = req.body;
+    console.log('Received Token:', token); // Debug log
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    console.log('Google Token Payload:', payload); // Debug log
+    console.log('Google Token Payload:', payload);
 
     let user = await User.findOne({ googleId: payload.sub });
     if (!user) {

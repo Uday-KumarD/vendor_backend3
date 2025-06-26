@@ -14,7 +14,7 @@ const app = express();
 
 // Middleware
 app.use(cors({ 
-  origin: process.env.FRONTEND_URL, // http://localhost:5173
+  origin: process.env.FRONTEND_URL,
   credentials: true 
 }));
 app.use(express.json());
@@ -22,7 +22,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }), // Updated to MONGODB_URI
+  store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -31,7 +36,6 @@ app.use(passport.session());
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 
-// Debug route to test server
 app.get('/', (req, res) => {
   res.send('Backend server is running');
 });
