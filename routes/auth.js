@@ -1,31 +1,44 @@
 const express = require('express');
 const passport = require('passport');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+const User = require('../models/User');
 
-router.get('/google', passport.authenticate('google', {
-  scope: ['profile', 'email']
-}));
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-router.get('/google/callback', passport.authenticate('google', {
-  failureRedirect: `${process.env.FRONTEND_URL}/login`
-}), (req, res) => {
-  console.log('Session after login:', req.session);
-  console.log('User on callback:', req.user);
-  res.redirect(`${process.env.FRONTEND_URL}/vendors`);
-});
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+router.get('/google/callback',
+  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/login` }),
+  (req, res) => {
+    console.log('Callback Success:', req.user);
+    console.log('Session:', req.session);
+    res.redirect(`${process.env.FRONTEND_URL}/vendors`);
+  }
+);
 
 router.post('/google', async (req, res) => {
-  const { token } = req.body;
-  console.log('Received Token:', token);
   try {
-    const ticket = await jwt.verify(token, process.env.GOOGLE_CLIENT_SECRET);
-    console.log('Google Token Payload:', ticket);
-    const user = {
-      googleId: ticket.sub,
-      displayName: ticket.name,
-      email: ticket.email
-    };
+    const { token } = req.body;
+    console.log('Received Token:', token);
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    console.log('Google Token Payload:', payload);
+
+    let user = await User.findOne({ googleId: payload.sub });
+    if (!user) {
+      user = new User({
+        googleId: payload.sub,
+        displayName: payload.name,
+        email: payload.email,
+      });
+      await user.save();
+      console.log('New user saved:', user);
+    }
+
     req.login(user, (err) => {
       if (err) {
         console.error('Login Error:', err);
