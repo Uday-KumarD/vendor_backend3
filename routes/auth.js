@@ -1,44 +1,41 @@
 const express = require('express');
 const passport = require('passport');
 const router = express.Router();
-const { OAuth2Client } = require('google-auth-library');
-const User = require('../models/User');
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+router.get('/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/login` }),
-  (req, res) => {
-    console.log('Callback Success:', req.user);
-    console.log('Session:', req.session);
-    res.redirect(`${process.env.FRONTEND_URL}/vendors`);
-  }
-);
+router.get('/google/callback', passport.authenticate('google', {
+  failureRedirect: `${process.env.FRONTEND_URL}/login`
+}), (req, res) => {
+  console.log('Session after login:', req.session);
+  console.log('User on callback:', req.user);
+  res.redirect(`${process.env.FRONTEND_URL}/vendors`);
+});
 
 router.post('/google', async (req, res) => {
+  const { token } = req.body;
+  console.log('Received Token:', token);
   try {
-    const { token } = req.body;
-    console.log('Received Token:', token);
+    const { OAuth2Client } = require('google-auth-library');
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID
     });
     const payload = ticket.getPayload();
     console.log('Google Token Payload:', payload);
-
-    let user = await User.findOne({ googleId: payload.sub });
-    if (!user) {
-      user = new User({
-        googleId: payload.sub,
-        displayName: payload.name,
-        email: payload.email,
-      });
-      await user.save();
-      console.log('New user saved:', user);
+    const user = {
+      googleId: payload.sub,
+      displayName: payload.name,
+      email: payload.email
+    };
+    let dbUser = await require('../models/User').findOne({ googleId: payload.sub });
+    if (!dbUser) {
+      dbUser = new (require('../models/User'))(user);
+      await dbUser.save();
     }
-
     req.login(user, (err) => {
       if (err) {
         console.error('Login Error:', err);
@@ -68,6 +65,7 @@ router.post('/logout', (req, res) => {
   req.logout(() => {
     req.session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
+      res.clearCookie('connect.sid');
       res.json({ message: 'Logged out' });
     });
   });
