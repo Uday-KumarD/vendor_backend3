@@ -11,7 +11,11 @@ passport.deserializeUser(async (googleId, done) => {
   console.log('Deserializing user with googleId:', googleId);
   try {
     const user = await User.findOne({ googleId });
-    done(null, user || { googleId });
+    if (!user) {
+      console.log('User not found in DB, using session user');
+      return done(null, { googleId });
+    }
+    done(null, user);
   } catch (err) {
     console.error('Deserialize Error:', err);
     done(err, null);

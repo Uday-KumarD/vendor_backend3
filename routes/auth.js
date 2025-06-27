@@ -1,6 +1,8 @@
 const express = require('express');
 const passport = require('passport');
 const router = express.Router();
+const { OAuth2Client } = require('google-auth-library');
+const User = require('../models/User');
 
 router.get('/google', passport.authenticate('google', {
   scope: ['profile', 'email']
@@ -18,7 +20,6 @@ router.post('/google', async (req, res) => {
   const { token } = req.body;
   console.log('Received Token:', token);
   try {
-    const { OAuth2Client } = require('google-auth-library');
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     const ticket = await client.verifyIdToken({
       idToken: token,
@@ -31,12 +32,12 @@ router.post('/google', async (req, res) => {
       displayName: payload.name,
       email: payload.email
     };
-    let dbUser = await require('../models/User').findOne({ googleId: payload.sub });
+    let dbUser = await User.findOne({ googleId: payload.sub });
     if (!dbUser) {
-      dbUser = new (require('../models/User'))(user);
+      dbUser = new User(user);
       await dbUser.save();
     }
-    req.login(user, (err) => {
+    req.login(user, { session: true }, (err) => {
       if (err) {
         console.error('Login Error:', err);
         return res.status(500).json({ message: 'Login failed' });
@@ -65,7 +66,12 @@ router.post('/logout', (req, res) => {
   req.logout(() => {
     req.session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      res.clearCookie('connect.sid');
+      res.clearCookie('connect.sid', {
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        httpOnly: true,
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/'
+      });
       res.json({ message: 'Logged out' });
     });
   });

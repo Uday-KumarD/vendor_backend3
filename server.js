@@ -27,8 +27,21 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', allowedOrigins.includes(req.headers.origin) ? req.headers.origin : '');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.status(204).send();
+  }
+  next();
+});
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -44,13 +57,15 @@ app.use(session({
   store: MongoStore.create({
     mongoUrl: process.env.MONGODB_URI,
     collectionName: 'sessions',
-    ttl: 24 * 60 * 60 // 24 hours
+    ttl: 24 * 60 * 60,
+    autoRemove: 'native'
   }),
   cookie: {
     secure: process.env.NODE_ENV === 'production' ? true : false,
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/'
   }
 }));
 
@@ -58,8 +73,9 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use((req, res, next) => {
-  console.log('Request URL:', req.url);
-  console.log('Session:', req.session);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log('Session ID:', req.sessionID);
+  console.log('Session:', JSON.stringify(req.session, null, 2));
   console.log('User:', req.user);
   next();
 });
