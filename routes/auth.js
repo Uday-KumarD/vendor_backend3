@@ -12,6 +12,7 @@ router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/login` }),
   (req, res) => {
     console.log('Callback Success:', req.user);
+    console.log('Session:', req.session);
     res.redirect(`${process.env.FRONTEND_URL}/vendors`);
   }
 );
@@ -22,7 +23,7 @@ router.post('/google', async (req, res) => {
     console.log('Received Token:', token);
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
     console.log('Google Token Payload:', payload);
@@ -32,9 +33,10 @@ router.post('/google', async (req, res) => {
       user = new User({
         googleId: payload.sub,
         displayName: payload.name,
-        email: payload.email
+        email: payload.email,
       });
       await user.save();
+      console.log('New user saved:', user);
     }
 
     req.login(user, (err) => {
@@ -42,6 +44,7 @@ router.post('/google', async (req, res) => {
         console.error('Login Error:', err);
         return res.status(500).json({ message: 'Login failed' });
       }
+      console.log('Session after login:', req.session);
       res.json({ user });
     });
   } catch (err) {
@@ -51,6 +54,8 @@ router.post('/google', async (req, res) => {
 });
 
 router.get('/user', (req, res) => {
+  console.log('Session on /user:', req.session);
+  console.log('User on /user:', req.user);
   if (req.user) {
     res.json(req.user);
   } else {
@@ -59,8 +64,12 @@ router.get('/user', (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
+  console.log('Session before logout:', req.session);
   req.logout(() => {
-    res.json({ message: 'Logged out' });
+    req.session.destroy((err) => {
+      if (err) console.error('Session destroy error:', err);
+      res.json({ message: 'Logged out' });
+    });
   });
 });
 

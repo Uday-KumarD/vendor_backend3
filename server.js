@@ -12,14 +12,26 @@ const vendorRoutes = require('./routes/vendors');
 
 const app = express();
 
-// Middleware
-app.use(cors({ 
-  origin: process.env.FRONTEND_URL,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://vendorfrontend2.netlify.app'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
 }));
 app.use(express.json());
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -35,7 +47,6 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 
